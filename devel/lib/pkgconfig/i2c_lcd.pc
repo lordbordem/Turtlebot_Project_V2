@@ -1,0 +1,8 @@
+prefix=/home/turtlebot/catkin_ws/devel
+
+Name: i2c_lcd
+Description: Description of i2c_lcd
+Version: 0.0.1
+Cflags: 
+Libs: -L/home/turtlebot/catkin_ws/devel/lib 
+Requires: 
