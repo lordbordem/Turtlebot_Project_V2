@@ -25,7 +25,7 @@ int buzzer = 9;
 int melody = 0;
 
 int bpm = 120;
-int harmonic = 1;
+int harmonic = 2;
 
 
 void messageCb( const std_msgs::Int8& play_melody){
@@ -209,5 +209,3 @@ void play(float melody[][2], int s, int b) {
     noTone(b);
   }
 }
-
-
