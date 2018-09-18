@@ -3,7 +3,7 @@
  * 
  * Arduino Button and Sound RosNode
  * 
- * MX2 Project Assignment 3 V1.0
+ * MX2 Project Assignment 3
  * Last Modified 18th September
  */
 
@@ -25,7 +25,7 @@ int buzzer = 9;
 int melody = 0;
 
 int bpm = 120;
-int harmonic = 2;
+int harmonic = 1;
 
 
 void messageCb( const std_msgs::Int8& play_melody){
@@ -38,6 +38,9 @@ std_msgs::Int8 pushed_msg;
 ros::Publisher pub_button("pushed", &pushed_msg);
 ros::Subscriber<std_msgs::Int8> sub("play_melody", &messageCb);
 
+int pentatonic[5] = {NOTE_C4, NOTE_DS4, NOTE_F4, NOTE_G4, NOTE_AS4};
+
+//TODO: Put these arrays in a seperate file and make a struct to store the size of the array (or figure out how to calculate the size of a passed array in a function)
 float randomSong[][2] = {
   {
     NOTE_C4, 1    }
@@ -162,11 +165,11 @@ void loop()
 {
   switch (melody) {
     case(1):
-    play(chariots, chariotsSize, buzzer);
+    play(chariots, buzzer);
     melody = 0;
     break;
     case(2):
-    play(randomSong, randomSongSize, buzzer);
+    play(randomSong, buzzer);
     melody = 0;
     break;
   }
@@ -183,7 +186,26 @@ void loop()
 
     //if the button value has not changed for the debounce delay, we know its stable
     if ( !published[i] && (millis() - last_debounce_time[i])  > debounce_delay && reading[i] == HIGH) {
-      tone(buzzer, NOTE_C4, tone_dur);
+      int f = 0;
+      switch(i) {
+        case(0):
+        f = 0.5*pentatonic[random(0,4)];
+        break;
+        case(1):
+        f = pentatonic[random(0,4)];
+        break;
+        case(2):
+        f = 2*pentatonic[random(0,4)];
+        break;
+        case(3):
+        f = 4*pentatonic[random(0,4)];
+        break;
+        case(4):
+        f = 8*pentatonic[random(0,4)];
+        play(chariots, buzzer);
+        break;
+      }
+      tone(buzzer, f, tone_dur);
       delay(tone_dur);
       noTone(buzzer);
       digitalWrite(13, HIGH-digitalRead(13));
@@ -199,13 +221,20 @@ void loop()
   nh.spinOnce();
 }
 
-void play(float melody[][2], int s, int b) {
-
+void play(float m[][2], int b) {
+  int s = sizeof(m) / sizeof(m[0]);
+  int currentMelody = melody;
   for (int thisNote = 0; thisNote < s; thisNote++) {
-    int noteDuration = (int) ((60000.0/bpm) * melody[thisNote][1]);
-    tone(b, (int) harmonic*melody[thisNote][0], noteDuration);
+    int noteDuration = (int) ((60000.0/bpm) * m[thisNote][1]);
+    tone(b, (int) harmonic*m[thisNote][0], noteDuration);
     int pauseBetweenNotes = noteDuration * 1.30;
-    delay(pauseBetweenNotes);
+    unsigned long currentMillis = millis();
+    while(millis() - currentMillis <= pauseBetweenNotes) {
+    }
+    //delay(pauseBetweenNotes);
+    if (melody != currentMelody) {
+      break;
+    }
     noTone(b);
   }
 }
