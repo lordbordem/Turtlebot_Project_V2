@@ -1,0 +1,8 @@
+prefix=/home/turtlebot/catkin_ws/install
+
+Name: turtlebot_drive
+Description: Description of turtlebot_drive
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/turtlebot/catkin_ws/install/lib 
+Requires: 
