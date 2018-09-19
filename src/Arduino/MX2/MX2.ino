@@ -202,7 +202,7 @@ void loop()
         break;
         case(4):
         f = 8*pentatonic[random(0,4)];
-        play(chariots, buzzer);
+        //play(chariots, buzzer);
         break;
       }
       tone(buzzer, f, tone_dur);
@@ -234,6 +234,11 @@ void play(float m[][2], int b) {
     //delay(pauseBetweenNotes);
     if (melody != currentMelody) {
       break;
+    }
+    for (int i = 0; i < 5; i++) {
+      if (digitalRead(button_pin[i]) == HIGH) {
+        break;
+      }
     }
     noTone(b);
   }
