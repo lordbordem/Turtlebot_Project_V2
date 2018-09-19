@@ -14,7 +14,7 @@ train_x_orig, train_y, test_x_orig, test_y, classes = load_data()
 
 count = 0;
 
-cam = cv2.VideoCapture(3)   # 0 -> index of camera
+cam = cv2.VideoCapture(2)   # 0 -> index of camera
 
 def predictBen():
     my_label_y = [1]

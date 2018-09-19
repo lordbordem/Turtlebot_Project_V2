@@ -254,9 +254,16 @@ void play(int a, int b) {
       int pauseBetweenNotes = noteDuration * 1.30;
       unsigned long currentMillis = millis();
       while(millis() - currentMillis <= pauseBetweenNotes) {
+        for (int i = 0; i < 5; i++) {
+          if (digitalRead(button_pin[i])) {
+            noTone(b);
+            return;
+          }
+        }
       }
       //delay(pauseBetweenNotes);
       if (melody != currentMelody) {
+        noTone(b);
         return;
       }
       noTone(b);
