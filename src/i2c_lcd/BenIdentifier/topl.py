@@ -109,7 +109,7 @@ parameters = L_layer_model(train_x, train_y, layers_dims, num_iterations = 2900,
 # print(parameters.size)
 
 import pickle
-pickle.dump(parameters, open( "weights.p", "wb"))
+pickle.dump(parameters, open( "weights.p", "wb"),protocol = 2)
 
 exit()
 count = 0

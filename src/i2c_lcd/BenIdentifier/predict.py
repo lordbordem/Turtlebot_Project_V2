@@ -9,7 +9,7 @@ import sys
 import rospy
 num_px = 64;
 
-parameters = pickle.load( open( "BenIdentifier/weights.p", "rb" ) )
+parameters = pickle.load( open( "/home/turtlebot/catkin_ws/src/i2c_lcd/BenIdentifier/weights.p", "rb" ))
 train_x_orig, train_y, test_x_orig, test_y, classes = load_data()
 
 count = 0;
@@ -29,7 +29,7 @@ def predictBen():
         sys.exit()
 
     if s:
-        cv2.imshow("test", img)
+        #cv2.imshow("test", img)
         cv2.waitKey(10)
 
     img = cv2.resize(img, (64, 64));

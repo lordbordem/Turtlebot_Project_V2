@@ -165,17 +165,20 @@ void loop()
 {
   switch (melody) {
     case(1):
-    play(chariots, buzzer);
+    play(0, buzzer);
     melody = 0;
     break;
     case(2):
-    play(randomSong, buzzer);
+    play(1, buzzer);
     melody = 0;
+    break;
+    default:
     break;
   }
 
   int reading[5];
-  for (int i = 0; i < 5; i++) {
+  int i;
+  for (i = 0; i < 5; i++) {
 
     reading[i] = digitalRead(button_pin[i]);
     if (last_reading[i] != reading[i]){
@@ -202,7 +205,6 @@ void loop()
         break;
         case(4):
         f = 8*pentatonic[random(0,4)];
-        //play(chariots, buzzer);
         break;
       }
       tone(buzzer, f, tone_dur);
@@ -221,25 +223,44 @@ void loop()
   nh.spinOnce();
 }
 
-void play(float m[][2], int b) {
-  int s = sizeof(m) / sizeof(m[0]);
-  int currentMelody = melody;
-  for (int thisNote = 0; thisNote < s; thisNote++) {
-    int noteDuration = (int) ((60000.0/bpm) * m[thisNote][1]);
-    tone(b, (int) harmonic*m[thisNote][0], noteDuration);
-    int pauseBetweenNotes = noteDuration * 1.30;
-    unsigned long currentMillis = millis();
-    while(millis() - currentMillis <= pauseBetweenNotes) {
-    }
-    //delay(pauseBetweenNotes);
-    if (melody != currentMelody) {
-      break;
-    }
-    for (int i = 0; i < 5; i++) {
-      if (digitalRead(button_pin[i]) == HIGH) {
-        break;
+void play(int a, int b) {
+  if(a)
+  {
+     int s = 4;
+    int currentMelody = melody;
+    for (int thisNote = 0; thisNote < s; thisNote++) 
+    {
+      int noteDuration = (int) ((60000.0/bpm) * randomSong[thisNote][1]);
+      tone(b, (int) harmonic*randomSong[thisNote][0], noteDuration);
+      int pauseBetweenNotes = noteDuration * 1.30;
+      unsigned long currentMillis = millis();
+      while(millis() - currentMillis <= pauseBetweenNotes) {
       }
+      //delay(pauseBetweenNotes);
+      if (melody != currentMelody) {
+        return;
+      }
+      noTone(b);
     }
-    noTone(b);
   }
+  else 
+  {
+    int s = 27;
+    int currentMelody = melody;
+    for (int thisNote = 0; thisNote < s; thisNote++) 
+    {
+      int noteDuration = (int) ((60000.0/bpm) * chariots[thisNote][1]);
+      tone(b, (int) harmonic*chariots[thisNote][0], noteDuration);
+      int pauseBetweenNotes = noteDuration * 1.30;
+      unsigned long currentMillis = millis();
+      while(millis() - currentMillis <= pauseBetweenNotes) {
+      }
+      //delay(pauseBetweenNotes);
+      if (melody != currentMelody) {
+        return;
+      }
+      noTone(b);
+    }
+  }  
+  
 }
