@@ -1,4 +1,4 @@
-from BenIdentifier.helper import *
+import BenIdentifier.helper
 import os
 import csv
 import scipy
@@ -7,65 +7,110 @@ import pickle
 import cv2
 import sys
 import rospy
-num_px = 64;
-
-parameters = pickle.load( open( "/home/turtlebot/catkin_ws/src/i2c_lcd/BenIdentifier/weights.p", "rb" ))
-train_x_orig, train_y, test_x_orig, test_y, classes = load_data()
-
-count = 0;
-
-cam = cv2.VideoCapture(2)   # 0 -> index of camera
-
-def predictBen():
-    my_label_y = [1]
-    s, img = cam.read()
-    cv2.waitKey(10)
-
-    k = cv2.waitKey(33)
-    if (k==27):    # Esc key to stop
-        cam.release()
-        cv2.destroyAllWindows()
-        rospy.signal_shutdown("exit cv2")
-        sys.exit()
-
-    if s:
-        #cv2.imshow("test", img)
-        cv2.waitKey(10)
-
-    img = cv2.resize(img, (64, 64));
-    image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    my_image = scipy.misc.imresize(image, size=(num_px,num_px)).reshape((1, num_px*num_px*3)).T
-    my_predicted_image = predict(my_image, my_label_y, parameters)
-
-    #print(classes[int(np.squeeze(my_predicted_image)),].decode("utf-8"))
-    return classes[int(np.squeeze(my_predicted_image)),].decode("utf-8")
+import pyrealsense2 as rs
+import numpy as np
 
 
-liveTest = False
-while(liveTest):
+class ben_identifier(object):
 
-    my_label_y = [1]
-    s, img = cam.read()
-    cv2.waitKey(10)
-    if s:    # frame captured without any errors
-        cv2.imshow("BEN?", img)
-        cv2.waitKey(10)
+    def __init__(self, camera=0, enable_realsense=False, liveTest=False):
+        self.num_px = 64
+        self.my_label_y = [1]
+        self.liveTest = liveTest
+        self.parameters = pickle.load(open("/home/turtlebot/catkin_ws/src/i2c_lcd/BenIdentifier/weights.p", "rb"))
+        (self.train_x_orig,
+         self.train_y,
+         self.test_x_orig,
+         self.test_y,
+         self.classes) = BenIdentifier.helper.load_data()
+        self.count = 0
+        self.height = 480
+        self.width = 680
+        self.camera_num = camera
+        self.camera = None
+        self.work_image = None
+        self.work_depth_image = None
+        self.enable_realsense = enable_realsense
+        self.rs_pipeline = None
+        self.rs_config = None
+        self.rs_framerate = 30
+        self.color_image = None
+        self.depth_image = None
+        self.rs_frames = None
 
-    img = cv2.resize(img, (64, 64));
-    image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    #fname = "./tempimg.png"
+    def init_camera(self):
+        if self.enable_realsense is not True:
+            try:
+                self.camera = cv2.VideoCapture(self.camera_num)
+            except cv2.error as e:
+                print("OpenCV Error", e)
+                sys.exit(1)
+        else:
+            self.rs_pipeline = rs.pipeline()
+            self.rs_config = rs.config()
+            self.rs_config.enable_stream(rs.stream.depth, self.width,
+                                         self.height, rs.format.z16,
+                                         self.rs_framerate)
+            self.rs_config.enable_stream(rs.stream.color, self.width,
+                                         self.height,
+                                         rs.format.bgr8,
+                                         self.rs_framerate)
+            self.rs_pipeline.start(self.rs_config)
 
-    #image = np.array(ndimage.imread(fname, flatten=False))
-    #fname = "./tempimg.png"
-    #image = np.array(ndimage.imread(fname, flatten=False))
-    my_image = scipy.misc.imresize(image, size=(num_px,num_px)).reshape((1, num_px*num_px*3)).T
-    my_predicted_image = predict(my_image, my_label_y, parameters)
+    def grab_frame(self):
+        if self.enable_realsense is not True:
+            try:
+                self.work_image = self.camera.read()
+            except cv2.error as e:
+                print("OpenCV Error", e)
+                sys.exit(1)
+        else:
+            self.rs_frames = self.rs_pipeline.wait_for_frames()
+            self.depth_image = self.rs_frames.get_depth_frame()
+            self.color_image = self.rs_frames.get_color_frame()
+            if not self.depth_image or not self.color_image:
+                return
+            self.work_depth_image = np.asanyarray(self.depth_image.get_data())
+            self.work_image = np.asanyarray(self.color_image.get_data())
 
-    #print("y = " + str(np.squeeze(my_predicted_image)) + ", your algorithm predicts a \"" + classes[int(np.squeeze(my_predicted_image)),].decode("utf-8") +  "\" picture.")
-    print(classes[int(np.squeeze(my_predicted_image)),].decode("utf-8"))
-    count += 1
-    #print(count)
+    def release_camera(self):
+        if self.enable_realsense is not True:
+            self.camera.release()
+        else:
+            self.rs_pipeline.stop()
+
+    def display_frame(self):
+        cv2.imshow("Ben Identifier", self.work_image)
+
+    def predictBen(self):
+
+        if not self.work_image:
+            self.work_image = cv2.resize(self.work_image, (64, 64));
+            image = cv2.cvtColor(self.work_image, cv2.COLOR_BGR2RGB)
+            predict_image = scipy.misc.imresize(image, size=(self.num_px, self.num_px)).reshape((1, self.num_px*self.num_px*3)).T
+            predict_image_result = BenIdentifier.helper.predict(predict_image, self.my_label_y, self.parameters)
+            if self.liveTest is not True:
+                return self.classes[int(np.squeeze(predict_image_result)), ].decode("utf-8")
+            else:
+                print(self.classes[int(np.squeeze(predict_image_result)), ].decode("utf-8"))
+
+            return "notben"
+
+
+def main():
+    ben_ident = ben_identifier(camera=0, liveTest=True, enable_realsense=False)
+
+    ben_ident.init_camera()
+
+    while True:
+        ben_ident.predictBen()
+        ben_ident.display_frame()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+
+if __name__ == '__main__':
+    main()
 
 
 #
