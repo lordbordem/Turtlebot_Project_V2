@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 
 import rospy
-import mraa_i2c_led as lcd
 
 from std_msgs.msg import String, Float64, Int8, UInt16
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Imu
-import BenIdentifier.predict
-from tf.transformations import euler_from_quaternion
+from sensor_msgs.msg import Image
+import interface
+import numpy as np
+import cv2
+from cv_bridge import CvBridge, CvBridgeError
 
 
-class lcd_menu(object):
+class sim_module(object):
     def __init__(self):
         self.lcd = None
         self.num_lcd_rows = 2
@@ -25,33 +27,46 @@ class lcd_menu(object):
         self.current_menu = 0
         self.last_string_length = 0
         self.ben_identifier = None
+        self.cv_depth_image = None
+        self.cv_rgb_image = None
+        self.rgb_get = False
+        self.depth_get = False
 
-    def init_lcd(self):
-        self.lcd = lcd.lcd()
-        self.lcd.write_cmd(self.lcd.LCD_CURSOROFF)
-        self.lcd.write_cmd(self.lcd.LCD_BLINKOFF)
+        self.text_xpos = 1050
+        self.text_ypos = 350
+        self.text_pos_multiplier = 40
+        self.font_size = 30
+
+        self.bridge = CvBridge()
+        self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.rgbCallback)
+        self.depth_sub = rospy.Subscriber("/camera/depth/image_raw", Image, self.depthCallback)
+
+        self.main_interface = interface.interface()
+
+    def init_sim(self):
+        self.main_interface.start_screen()
+        self.main_interface.init_joystick()
+        self.main_interface.create_menu()
         self.display_text(("Starting", "MX2"))
-
-    def init_ben(self):
-        self.ben_identifier = BenIdentifier.predict.ben_identifier(camera=0,
-                                                                   liveTest=False,
-                                                                   enable_realsense=False)
-        self.ben_identifier.init_camera()
 
     def display_text(self, line):
         for i, text in enumerate(line):
-            if len(text) > self.last_string_length[i]:
-                self.lcd.clear()
-            self.last_string_length[i] = len(text)
-
-        for i, text in enumerate(line):
-            self.lcd.display_string(text, i+1)
+            self.main_interface.display_text(text, self.text_xpos, (self.text_ypos + (self.text_pos_multiplier*i)), self.font_size)
 
     def update_current_menu(self, menu):
         self.current_menu = menu
 
+    def update_frame(self):
+        if self.depth_get is True and self.rgb_get is True:
+            display = np.hstack((self.cv_rgb_image, self.cv_depth_image))
+            self.menu_loop()
+            self.main_interface.update_frame(display)
+
+        self.main_interface.process_events()
+
     def menu_loop(self):
-        if(self.last_button_pressed == 4):
+        self.last_button_pressed = self.main_interface.get_key_input()
+        if(self.last_button_pressed is 4):
             self.display_text(self.imu_line)
 
         elif(self.last_button_pressed == 2):
@@ -68,9 +83,6 @@ class lcd_menu(object):
         self.imu_line[0] = "Acc(m/s) " + "X=" + str(x_value)
         self.imu_line[1] = "Y=" + str(y_value) + " Z=" + str(z_value)
 
-    def buttonCallback(self, data):
-        self.last_button_pressed = data.data
-
     def rpmCallback(self, data):
         # q = (data.pose.pose.orientation.x,
         #     data.pose.pose.orientation.y,
@@ -81,30 +93,42 @@ class lcd_menu(object):
         self.rpm_line[0] = "Speed m/s"
         self.rpm_line[1] = "%.5f" % data.twist.twist.linear.x
 
-    def ben_finder(self):
-        self.ben_line[0] = "Ben Finder"
-        ben_result = self.ben_identifier.predictBen()
+    def get_cv_rgb_image(self):
+        return self.cv_rgb_image
 
-        if ben_result is "ben":
-            self.ben_line[1] = "Found Ben"
-        else:
-            self.ben_line[1] = "No Ben"
+    def get_cv_depth_image(self):
+        return self.cv_depth_image
+
+    def rgbCallback(self, data):
+        try:
+            self.cv_rgb_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+            self.rgb_get = True
+        except CvBridgeError as e:
+            print(e)
+
+    def depthCallback(self, data):
+        try:
+            self.cv_depth_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+            self.depth_get = True
+        except CvBridgeError as e:
+            print(e)
 
 
 def listener():
 
-    menu = lcd_menu()
-    menu.init_ben()
+    menu = sim_module()
+    menu.init_sim()
 
-    rospy.init_node('i2cLcdListener')
-    rospy.Subscriber('/pushed', Int8, menu.buttonCallback)
+    rospy.init_node('arduino_sim')
+    rospy.Publisher('/play_melody', Int8, queue_size=1)
+    rospy.Publisher('/pushed', Int8, queue_size=1)
     rospy.Subscriber('/imu', Imu, menu.imuCallback)
     rospy.Subscriber('/odom', Odometry, menu.rpmCallback)
 
     rate = rospy.Rate(60)  # 60hz
 
     while not rospy.is_shutdown():
-        menu.menu_loop()
+        menu.update_frame()
         rate.sleep()
 
     rospy.spin()
