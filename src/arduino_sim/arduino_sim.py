@@ -41,12 +41,18 @@ class sim_module(object):
         self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.rgbCallback)
         self.depth_sub = rospy.Subscriber("/camera/depth/image_raw", Image, self.depthCallback)
 
+        self.imu_values = rospy.Subscriber('/imu', Imu, self.imuCallback)
+        self.odom_values = rospy.Subscriber('/odom', Odometry, self.rpmCallback)
+
+        self.music_subscriber = rospy.Subscriber('/play_melody', Int8, self.musicCallback)
+        self.button_publisher = rospy.Publisher('/pushed', Int8, queue_size=1)
+
         self.main_interface = interface.interface()
 
     def init_sim(self):
         self.main_interface.start_screen()
         self.main_interface.init_joystick()
-        self.main_interface.create_menu()
+        #self.main_interface.create_menu()
         self.display_text(("Starting", "MX2"))
 
     def display_text(self, line):
@@ -57,15 +63,27 @@ class sim_module(object):
         self.current_menu = menu
 
     def update_frame(self):
-        if self.depth_get is True and self.rgb_get is True:
-            display = np.hstack((self.cv_rgb_image, self.cv_depth_image))
+        if self.rgb_get is True:
             self.menu_loop()
-            self.main_interface.update_frame(display)
+            self.main_interface.update_frame(self.cv_rgb_image)
+            self.rgb_get = False
 
         self.main_interface.process_events()
 
+
+        # if self.depth_get is True and self.rgb_get is True:
+        #     self.cv_depth_image = cv2.cvtColor(self.cv_depth_image, cv2.COLOR_GRAY2BGR)
+        #     display = np.vstack((self.cv_rgb_image, self.cv_depth_image))
+        #     self.menu_loop()
+        #     self.main_interface.update_frame(display)
+        #     self.depth_get = False
+        #     self.rgb_get = False
+        #
+        # self.main_interface.process_events()
+
     def menu_loop(self):
         self.last_button_pressed = self.main_interface.get_key_input()
+        self.button_publisher.publish(self.last_button_pressed)
         if(self.last_button_pressed is 4):
             self.display_text(self.imu_line)
 
@@ -93,6 +111,16 @@ class sim_module(object):
         self.rpm_line[0] = "Speed m/s"
         self.rpm_line[1] = "%.5f" % data.twist.twist.linear.x
 
+    def musicCallback(self, data):
+        # q = (data.pose.pose.orientation.x,
+        #     data.pose.pose.orientation.y,
+        #     data.pose.pose.orientation.z,
+        #     data.pose.pose.orientation.w)
+        # angles = euler_from_quaternion(q)
+        # RpmLine2 = "%.5f" % (angles[2])
+        text = "Music: No " + str(data)
+        self.main_interface.display_text(text, self.text_xpos, (self.text_ypos + (self.text_pos_multiplier*4)), self.font_size)
+
     def get_cv_rgb_image(self):
         return self.cv_rgb_image
 
@@ -108,7 +136,7 @@ class sim_module(object):
 
     def depthCallback(self, data):
         try:
-            self.cv_depth_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+            self.cv_depth_image = self.bridge.imgmsg_to_cv2(data)
             self.depth_get = True
         except CvBridgeError as e:
             print(e)
@@ -118,12 +146,7 @@ def listener():
 
     menu = sim_module()
     menu.init_sim()
-
     rospy.init_node('arduino_sim')
-    rospy.Publisher('/play_melody', Int8, queue_size=1)
-    rospy.Publisher('/pushed', Int8, queue_size=1)
-    rospy.Subscriber('/imu', Imu, menu.imuCallback)
-    rospy.Subscriber('/odom', Odometry, menu.rpmCallback)
 
     rate = rospy.Rate(60)  # 60hz
 

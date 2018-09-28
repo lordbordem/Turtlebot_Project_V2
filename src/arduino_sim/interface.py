@@ -177,6 +177,7 @@ class interface(object):
         return self.color_update_ready
 
     def display_text(self, text, xpos, ypos, font_size):
+        self.screen.fill(pygame.Color("black"), (xpos, ypos, 500, 100))
         self.text = str(text)
         self.text_font_object = pygame.font.SysFont(name=self.text_font,
                                                     size=font_size)
@@ -193,14 +194,14 @@ class interface(object):
         self.frame = np.rot90(self.frame)
         self.frame = pygame.surfarray.make_surface(self.frame)
         self.screen.blit(self.frame, (0, 0))
-        self.menu_content.blit()
-        self.menu_content.update()
+        #self.menu_content.blit()
+        #self.menu_content.update()
         pygame.display.update()
 
     def process_events(self):
         pygame.event.pump()
         for event in pygame.event.get():
-            self.menu.react(event)
+            #self.menu.react(event)
             if event.type == pygame.QUIT:
                 self.exit_run = True
 
